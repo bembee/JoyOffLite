@@ -37,16 +37,15 @@ include $(DEVKITPRO)/libnx/switch_rules
 #   of a homebrew executable (.nro). This is intended to be used for sysmodules.
 #   NACP building is skipped as well.
 #---------------------------------------------------------------------------------
-TARGET		:=	JoyOff
+TARGET		:=	JoyOffLite
 BUILD		:=	build
-SOURCES		:=	source nanovg/source nanovg/source/framework
+SOURCES		:=	source
 DATA		:=	data
-INCLUDES	:=	include nanovg/include nanovg/include/nanovg nanovg/include/nanovg/framework
-ROMFS		:=	romfs
+INCLUDES	:=	include
 
-APP_VERSION := 1.6.0
-APP_TITLE   := JoyOff
-APP_AUTHOR  := STHETIX
+APP_VERSION := 1.0.0
+APP_TITLE   := JoyOffLite
+APP_AUTHOR  := Bembee
 ICON        := assets/icon.jpg
 
 #---------------------------------------------------------------------------------
@@ -64,11 +63,10 @@ CXXFLAGS	:= $(CFLAGS) -std=gnu++17 -fno-rtti -fno-exceptions -DJOYOFF_VERSION=\"
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=  -ldeko3d -lnx
+LIBS	:=  -lnx
 
 #---------------------------------------------------------------------------------
-# list of directories containing libraries, this must be the top level containing
-# include and lib
+# list of directories containing libraries
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(PORTLIBS) $(LIBNX)
 
@@ -118,19 +116,6 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-ifeq ($(strip $(CONFIG_JSON)),)
-	jsons := $(wildcard *.json)
-	ifneq (,$(findstring $(TARGET).json,$(jsons)))
-		export APP_JSON := $(TOPDIR)/$(TARGET).json
-	else
-		ifneq (,$(findstring config.json,$(jsons)))
-			export APP_JSON := $(TOPDIR)/config.json
-		endif
-	endif
-else
-	export APP_JSON := $(TOPDIR)/$(CONFIG_JSON)
-endif
-
 ifeq ($(strip $(ICON)),)
 	icons := $(wildcard *.jpg)
 	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
@@ -152,69 +137,28 @@ ifeq ($(strip $(NO_NACP)),)
 	export NROFLAGS += --nacp=$(CURDIR)/$(TARGET).nacp
 endif
 
-ifneq ($(APP_TITLEID),)
-	export NACPFLAGS += --titleid=$(APP_TITLEID)
-endif
-
 # Set ABI version to avoid homebrew manager warnings
 export NACPFLAGS += --abi=64bit
 
-ifneq ($(ROMFS),)
-	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
-endif
+.PHONY: $(BUILD) clean all
 
-.PHONY: $(BUILD) clean all dist release
+all: $(BUILD)
 
-#---------------------------------------------------------------------------------
-SHADER_DIR := $(CURDIR)/romfs/shaders
-SHADERS := $(SHADER_DIR)/fill_vsh.dksh $(SHADER_DIR)/fill_fsh.dksh $(SHADER_DIR)/fill_aa_fsh.dksh
-
-export ROMFS_DEPS := $(SHADERS)
-
-all: release
-
-$(SHADER_DIR):
-	@mkdir -p $@
-
-$(SHADER_DIR)/%_vsh.dksh: nanovg/shaders/%_vsh.glsl | $(SHADER_DIR)
-	@uam -s vert -o $@ $<
-
-$(SHADER_DIR)/%_fsh.dksh: nanovg/shaders/%_fsh.glsl | $(SHADER_DIR)
-	@uam -s frag -o $@ $<
-
-$(BUILD): $(SHADERS)
+$(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-#---------------------------------------------------------------------------------
-dist: $(BUILD)
-	@echo Creating distribution package...
-	@mkdir -p switch
-	@cp $(TARGET).nro switch/$(TARGET).nro
-	@echo Package created in switch/$(TARGET).nro
-
-#---------------------------------------------------------------------------------
-release: dist
-	@echo Creating zip archive...
-	@zip -q - switch/$(TARGET).nro > $(TARGET)-$(APP_VERSION).zip
-	@zip -r $(TARGET)-$(APP_VERSION)-source.zip source/ nanovg/ assets/ docs/ Makefile README.md COPYING COPYING.GPL COPYING.ART
-	@echo Created $(TARGET)-$(APP_VERSION).zip
-
-#---------------------------------------------------------------------------------
-
+clean:
+	@echo clean build house...
+	@rm -rf $(BUILD) $(TARGET).nacp $(TARGET).elf $(TARGET).nro
 
 #---------------------------------------------------------------------------------
 else
 .PHONY:	all
 
-$(OUTPUT).nro: $(ROMFS_DEPS) $(APP_ICON)
+$(OUTPUT).nro: $(APP_ICON)
 
 DEPENDS	:=	$(OFILES:.o=.d)
-
-#---------------------------------------------------------------------------------
-# main targets
-#---------------------------------------------------------------------------------
-ifeq ($(strip $(APP_JSON)),)
 
 all	:	$(OUTPUT).nro
 
@@ -222,16 +166,6 @@ ifeq ($(strip $(NO_NACP)),)
 $(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
 else
 $(OUTPUT).nro	:	$(OUTPUT).elf
-endif
-
-else
-
-all	:	$(OUTPUT).nsp
-
-$(OUTPUT).nsp	:	$(OUTPUT).nso $(OUTPUT).npdm
-
-$(OUTPUT).nso	:	$(OUTPUT).elf
-
 endif
 
 $(OUTPUT).elf	:	$(OFILES)
